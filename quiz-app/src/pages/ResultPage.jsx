@@ -16,7 +16,7 @@ export default function ResultPage() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/api/auth/me", {
+        const res = await axios.get("https://quizarena-8un2.onrender.com/api/auth/me", {
           headers: { Authorization: `Bearer ${token}` },
         });
         setUser(res.data.user || { name: "Guest", username: "Guest" });
