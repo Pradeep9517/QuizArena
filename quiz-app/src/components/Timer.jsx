@@ -1,18 +1,25 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 export default function Timer({ duration, onTimeUp }) {
   const [time, setTime] = useState(duration);
+  const timerRef = useRef(null);
 
   useEffect(() => {
-    if (time <= 0) {
-      onTimeUp();
-      return;
-    }
-    const timer = setInterval(() => {
-      setTime((prev) => prev - 1);
+    // ✅ Run timer only once
+    timerRef.current = setInterval(() => {
+      setTime((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          onTimeUp();
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
-    return () => clearInterval(timer);
-  }, [time, onTimeUp]);
+
+    // Cleanup on unmount
+    return () => clearInterval(timerRef.current);
+  }, [onTimeUp]);
 
   const minutes = Math.floor(time / 60);
   const seconds = time % 60;
