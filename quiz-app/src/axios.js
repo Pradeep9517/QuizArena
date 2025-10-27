@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: "https://quizarena-8un2.onrender.com/api",
 });
 
 // ✅ Request interceptor: JWT token add kare
