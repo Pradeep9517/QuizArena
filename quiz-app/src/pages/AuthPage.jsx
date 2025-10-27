@@ -9,7 +9,7 @@ export default function AuthPage() {
   return (
     <div
       className="min-h-screen flex flex-col justify-center items-center px-4 bg-cover bg-center bg-no-repeat"
-      style={{ backgroundImage: "url('/10740576.jpg')" }}
+      style={{ backgroundImage: "url('/10740576.webp')" }}
     >
       {/* Card */}
       <div className="w-full max-w-md bg-gradient-to-br from-purple-200 via-purple-100 to-white rounded-3xl shadow-2xl hover:shadow-3xl transform hover:scale-105 transition p-8 relative overflow-hidden bg-opacity-90 backdrop-blur-md">
