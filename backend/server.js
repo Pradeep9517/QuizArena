@@ -14,7 +14,10 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "https://quizarenas.vercel.app", // frontend
+    origin: [
+      "https://quizarenas.vercel.app",
+      "https://quizarenas-5zlehkbza-pradeep-singhs-projects-5b466fb1.vercel.app"
+    ],// frontend
     methods: ["GET", "POST"],
   },
 });
