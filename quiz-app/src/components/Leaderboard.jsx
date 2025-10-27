@@ -1,48 +1,62 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import socket from "../socket";
 
 export default function Leaderboard({ quizId, subject }) {
   const [leaders, setLeaders] = useState([]);
   const [currentUser, setCurrentUser] = useState(null);
+  const latestLeaders = useRef([]);
 
-  // ✅ Load user from localStorage
+  // ✅ Load user once from localStorage
   useEffect(() => {
     const saved = localStorage.getItem("user");
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        console.log("✅ Loaded user:", parsed);
-        setCurrentUser(parsed);
+        setCurrentUser(JSON.parse(saved));
       } catch (e) {
-        console.error("❌ Invalid user in localStorage", e);
+        console.error("Invalid user in localStorage", e);
       }
     }
   }, []);
 
-  // ✅ Listen for leaderboard updates
+  // ✅ Real-time leaderboard updates
   useEffect(() => {
+    if (!quizId) return;
+
+    // Use throttling to limit re-render frequency (every 300ms)
+    let updateTimeout = null;
+
     const handleUpdate = (data) => {
-      console.log("📊 Raw leaderboard data:", data);
+      const filtered = data
+        .filter(
+          (u) => String(u.quizId) === String(quizId) && u.subject === subject
+        )
+        .sort((a, b) => b.score - a.score);
 
-      const filtered = data.filter(
-        (u) => String(u.quizId) === String(quizId) && u.subject === subject
-      );
+      // Avoid unnecessary re-render if data unchanged
+      const same =
+        JSON.stringify(filtered) === JSON.stringify(latestLeaders.current);
+      if (same) return;
 
-      // Sort by highest score
-      filtered.sort((a, b) => b.score - a.score);
-      setLeaders(filtered);
+      latestLeaders.current = filtered;
+
+      clearTimeout(updateTimeout);
+      updateTimeout = setTimeout(() => setLeaders(filtered), 300);
     };
 
-    socket.on("leaderboardUpdate", handleUpdate);
+    socket.emit("joinQuiz", { quizId });
     socket.emit("getLeaderboard", { quizId });
 
+    socket.on("leaderboardUpdate", handleUpdate);
+
     return () => {
+      clearTimeout(updateTimeout);
       socket.off("leaderboardUpdate", handleUpdate);
+      socket.emit("leaveQuiz", { quizId });
     };
   }, [quizId, subject]);
 
   return (
-    <div className="p-4 bg-gray-50 rounded-xl shadow">
+    <div className="p-4 bg-gray-50 rounded-xl shadow transition-all duration-300">
       <h2 className="text-xl font-bold mb-4 text-center">🏆 Leaderboard</h2>
 
       {leaders.length === 0 ? (
@@ -52,29 +66,26 @@ export default function Leaderboard({ quizId, subject }) {
           {leaders.map((user, i) => {
             let bgColor = "bg-white";
             let medal = "";
-            let medalColor = "";
 
-            if (i === 0) { bgColor = "bg-[#FFD700]"; medal = "🥇"; medalColor = "#FFD700"; }
-            else if (i === 1) { bgColor = "bg-[#C0C0C0]"; medal = "🥈"; medalColor = "#C0C0C0"; }
-            else if (i === 2) { bgColor = "bg-[#CD7F32]"; medal = "🥉"; medalColor = "#CD7F32"; }
+            if (i === 0) bgColor = "bg-[#FFD700]";
+            else if (i === 1) bgColor = "bg-[#C0C0C0]";
+            else if (i === 2) bgColor = "bg-[#CD7F32]";
 
-            // ✅ Match userId with currentUser.id (not _id)
             const isSelf =
               currentUser && String(user.userId) === String(currentUser.id);
 
-            if (isSelf) console.log("💡 Highlighting:", user.username);
-
             return (
               <li
-                key={user._id || i}
-                className={`p-2 shadow rounded-lg flex justify-between items-center ${
+                key={user.userId || i}
+                className={`p-2 shadow rounded-lg flex justify-between items-center transition-all duration-300 ${
                   isSelf ? "border-2 border-blue-500 bg-blue-50" : bgColor
                 }`}
               >
                 <span>
-                  {i + 1}. {user.username || user.name}
-                  {medal && <span style={{ color: medalColor, marginLeft: 4 }}>{medal}</span>}
-                  {isSelf && <span className="text-blue-600 font-semibold ml-1">(You)</span>}
+                  {i + 1}. {user.username || user.name}{" "}
+                  {isSelf && (
+                    <span className="text-blue-600 font-semibold ml-1">(You)</span>
+                  )}
                 </span>
                 <span className="font-bold">{user.score} pts</span>
               </li>
