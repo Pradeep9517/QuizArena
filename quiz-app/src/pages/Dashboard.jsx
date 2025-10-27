@@ -11,7 +11,7 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/api/auth/me", {
+        const res = await axios.get("https://quizarena-8un2.onrender.com", {
           headers: { Authorization: `Bearer ${token}` },
         });
         setUser(res.data.user || { name: "Guest", score: 0 });
@@ -23,7 +23,7 @@ export default function Dashboard() {
 
     const fetchQuizzes = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/api/quiz");
+        const res = await axios.get("https://quizarena-8un2.onrender.com");
         setQuizzes(res.data);
       } catch (err) {
         console.log(err);
