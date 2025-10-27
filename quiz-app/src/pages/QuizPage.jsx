@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axiosInstance from "../utils/axiosInstance";
 import socket from "../socket";
@@ -10,7 +10,6 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function QuizPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-
   const [quiz, setQuiz] = useState(null);
   const [answers, setAnswers] = useState({});
   const [user, setUser] = useState(null);
@@ -20,8 +19,14 @@ export default function QuizPage() {
   const token =
     localStorage.getItem("token") || sessionStorage.getItem("token");
 
-  // ✅ Fetch quiz + user together (parallel)
+  // ✅ Use cached quiz (for instant reload)
   useEffect(() => {
+    const cachedQuiz = sessionStorage.getItem(`quiz_${id}`);
+    const cachedUser = sessionStorage.getItem("user");
+
+    if (cachedQuiz) setQuiz(JSON.parse(cachedQuiz));
+    if (cachedUser) setUser(JSON.parse(cachedUser));
+
     const fetchAll = async () => {
       try {
         const [userRes, quizRes] = await Promise.all([
@@ -31,57 +36,65 @@ export default function QuizPage() {
           axiosInstance.get(`/api/quiz/${id}`),
         ]);
 
-        setUser(userRes.data.user);
-        setQuiz(quizRes.data);
+        const userData = userRes.data.user;
+        const quizData = quizRes.data;
+
+        setUser(userData);
+        setQuiz(quizData);
+
+        sessionStorage.setItem("user", JSON.stringify(userData));
+        sessionStorage.setItem(`quiz_${id}`, JSON.stringify(quizData));
       } catch (err) {
-        console.error("Fetch failed:", err);
+        console.error("Quiz fetch failed:", err);
         setUser({ name: "Guest" });
       } finally {
         setLoading(false);
       }
     };
+
     fetchAll();
   }, [id, token]);
 
-  // ✅ Join socket after data ready
+  // ✅ Socket join/leave optimized
   useEffect(() => {
-    if (!user || !quiz) return;
+    if (!user || !quiz || !socket?.connected) return;
     const username = user.username || user.name;
-    if (socket && socket.connected) {
-      socket.emit("joinQuiz", { quizId: id, user: username });
-    }
+    socket.emit("joinQuiz", { quizId: id, user: username });
 
     return () => {
-      if (socket && socket.connected)
-        socket.emit("leaveQuiz", { quizId: id, user: username });
+      socket.emit("leaveQuiz", { quizId: id, user: username });
     };
   }, [id, user, quiz]);
 
-  const handleAnswer = (qId, option) => {
+  // ✅ Memoized question to prevent unnecessary re-render
+  const currentQuestion = useMemo(
+    () => quiz?.questions?.[currentQuestionIndex],
+    [quiz, currentQuestionIndex]
+  );
+
+  // ✅ Stable callbacks
+  const handleAnswer = useCallback((qId, option) => {
     setAnswers((prev) => ({ ...prev, [qId]: option }));
-  };
+  }, []);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     if (!token) return alert("Please login to submit quiz!");
-
     try {
       const res = await axiosInstance.post(`/api/quiz/${id}/submit`, {
         answers,
       });
-
       socket.emit("quizSubmitted", {
         quizId: id,
         subject: quiz.subject || "General",
       });
-
       navigate(`/result/${id}`, { state: { result: res.data, quiz } });
     } catch (err) {
       console.error("Submission failed:", err);
-      alert("Quiz submission failed");
+      alert("Quiz submission failed!");
     }
-  };
+  }, [id, quiz, answers, token, navigate]);
 
-  // ✅ Skeleton Loader
+  // ✅ Fast Skeleton Loader
   if (loading)
     return (
       <div className="flex items-center justify-center h-screen bg-gradient-to-b from-purple-50 to-white">
@@ -99,8 +112,6 @@ export default function QuizPage() {
         </h1>
       </div>
     );
-
-  const currentQuestion = quiz.questions[currentQuestionIndex];
 
   return (
     <>
@@ -121,13 +132,14 @@ export default function QuizPage() {
               {/* Progress Bar */}
               <div className="w-full bg-purple-100 h-2 rounded-full mt-1 sm:mt-2 overflow-hidden">
                 <motion.div
+                  key={currentQuestionIndex}
                   initial={{ width: 0 }}
                   animate={{
                     width: `${((currentQuestionIndex + 1) /
                       quiz.questions.length) *
                       100}%`,
                   }}
-                  transition={{ duration: 0.3, ease: "easeOut" }}
+                  transition={{ duration: 0.25 }}
                   className="h-2 bg-gradient-to-r from-purple-500 to-pink-500"
                 />
               </div>
@@ -135,38 +147,40 @@ export default function QuizPage() {
             <Timer duration={quiz.duration} onTimeUp={handleSubmit} />
           </div>
 
-          {/* Question */}
+          {/* Question Animation */}
           <AnimatePresence mode="wait">
-            <motion.div
-              key={currentQuestion._id}
-              initial={{ opacity: 0, x: 30 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -30 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="p-4 sm:p-6 border-2 border-purple-200 rounded-2xl bg-white shadow transition"
-            >
-              <h2 className="font-semibold text-base sm:text-lg mb-4 text-purple-700">
-                {currentQuestionIndex + 1}. {currentQuestion.text}
-              </h2>
-              <div className="grid gap-2 sm:gap-3">
-                {currentQuestion.options.map((opt, i) => {
-                  const isSelected = answers[currentQuestion._id] === opt;
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => handleAnswer(currentQuestion._id, opt)}
-                      className={`p-2 sm:p-3 rounded-xl border-2 text-left text-sm sm:text-base transition-all w-full ${
-                        isSelected
-                          ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white border-purple-500 shadow-md scale-[1.02]"
-                          : "bg-purple-50 border-purple-200 hover:border-purple-400 hover:bg-purple-100"
-                      }`}
-                    >
-                      {opt}
-                    </button>
-                  );
-                })}
-              </div>
-            </motion.div>
+            {currentQuestion && (
+              <motion.div
+                key={currentQuestion._id}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+                transition={{ duration: 0.2 }}
+                className="p-4 sm:p-6 border-2 border-purple-200 rounded-2xl bg-white shadow transition"
+              >
+                <h2 className="font-semibold text-base sm:text-lg mb-4 text-purple-700">
+                  {currentQuestionIndex + 1}. {currentQuestion.text}
+                </h2>
+                <div className="grid gap-2 sm:gap-3">
+                  {currentQuestion.options.map((opt, i) => {
+                    const isSelected = answers[currentQuestion._id] === opt;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => handleAnswer(currentQuestion._id, opt)}
+                        className={`p-2 sm:p-3 rounded-xl border-2 text-left text-sm sm:text-base transition-all w-full ${
+                          isSelected
+                            ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white border-purple-500 shadow-md scale-[1.02]"
+                            : "bg-purple-50 border-purple-200 hover:border-purple-400 hover:bg-purple-100"
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
           </AnimatePresence>
 
           {/* Navigation Buttons */}
