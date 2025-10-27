@@ -69,8 +69,7 @@ export default function QuizPage() {
 
     try {
       const res = await axios.post(
-        `https://quizarena-8un2.onrender.com
-/api/quiz/${id}/submit`,
+        `https://quizarena-8un2.onrender.com/api/quiz/${id}/submit`,
         { answers },
         { headers: { Authorization: `Bearer ${token}` } }
       );
