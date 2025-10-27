@@ -1,54 +1,56 @@
 // src/pages/Dashboard.jsx
 import { useEffect, useState } from "react";
-import axios from "axios";
-import Nav from '../components/Navbar'
+import { useNavigate } from "react-router-dom";
+import axiosInstance from "../utils/axiosInstance";
+import Nav from "../components/Navbar";
 
 export default function Dashboard() {
   const [quizzes, setQuizzes] = useState([]);
   const [user, setUser] = useState({ name: "", score: 0 });
-  const token = localStorage.getItem("token");
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchUser = async () => {
+    const fetchData = async () => {
       try {
-        const res = await axios.get("https://quizarena-8un2.onrender.com/api/auth/me", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setUser(res.data.user || { name: "Guest", score: 0 });
+        // 🌀 Run both API calls in parallel for speed
+        const [userRes, quizRes] = await Promise.all([
+          axiosInstance.get("/api/auth/me"),
+          axiosInstance.get("/api/quiz"),
+        ]);
+
+        setUser(userRes.data.user || { name: "Guest", score: 0 });
+        setQuizzes(quizRes.data);
       } catch (err) {
-        console.log("User fetch failed:", err);
+        console.error("Dashboard fetch failed:", err);
         setUser({ name: "Guest", score: 0 });
+      } finally {
+        setLoading(false);
       }
     };
 
-    const fetchQuizzes = async () => {
-      try {
-        const res = await axios.get("https://quizarena-8un2.onrender.com/api/quiz");
-        setQuizzes(res.data);
-      } catch (err) {
-        console.log(err);
-      }
-    };
+    fetchData();
+  }, []);
 
-    fetchUser();
-    fetchQuizzes();
-  }, [token]);
+  if (loading)
+    return (
+      <div className="min-h-screen flex justify-center items-center text-lg font-semibold text-purple-700">
+        Loading dashboard...
+      </div>
+    );
 
   return (
     <>
       <Nav user={user} />
       <div className="min-h-screen bg-gradient-to-b from-purple-100 to-white px-4 sm:px-6 lg:px-8 py-6">
-        {/* Welcome */}
+        {/* Welcome Section */}
         <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg mb-6 text-center">
           <h2 className="text-2xl sm:text-3xl font-bold mb-2 text-purple-700">
             Welcome, {user?.name || "Guest"}!
           </h2>
-          {/* <p className="text-gray-600 text-sm sm:text-base">
-            Your current score: {user?.score || 0}
-          </p> */}
         </div>
 
-        {/* Quizzes */}
+        {/* Quiz Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {quizzes.map((quiz) => (
             <div
@@ -62,7 +64,7 @@ export default function Dashboard() {
                 </p>
               </div>
               <button
-                onClick={() => (window.location.href = `/quiz/${quiz._id}`)}
+                onClick={() => navigate(`/quiz/${quiz._id}`)}
                 className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 sm:px-5 sm:py-3 rounded-xl w-full sm:w-auto transition"
               >
                 Join Quiz
