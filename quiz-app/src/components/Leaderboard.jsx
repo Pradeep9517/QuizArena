@@ -1,21 +1,39 @@
 import { useEffect, useState } from "react";
 import socket from "../socket";
 
-export default function Leaderboard({ quizId, subject, currentUser }) {
+export default function Leaderboard({ quizId, subject }) {
   const [leaders, setLeaders] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
 
+  // ✅ Load user from localStorage
   useEffect(() => {
-    // Listen for leaderboard updates
+    const saved = localStorage.getItem("user");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        console.log("✅ Loaded user:", parsed);
+        setCurrentUser(parsed);
+      } catch (e) {
+        console.error("❌ Invalid user in localStorage", e);
+      }
+    }
+  }, []);
+
+  // ✅ Listen for leaderboard updates
+  useEffect(() => {
     const handleUpdate = (data) => {
+      console.log("📊 Raw leaderboard data:", data);
+
       const filtered = data.filter(
         (u) => String(u.quizId) === String(quizId) && u.subject === subject
       );
+
+      // Sort by highest score
+      filtered.sort((a, b) => b.score - a.score);
       setLeaders(filtered);
     };
 
     socket.on("leaderboardUpdate", handleUpdate);
-
-    // Request leaderboard
     socket.emit("getLeaderboard", { quizId });
 
     return () => {
@@ -40,17 +58,21 @@ export default function Leaderboard({ quizId, subject, currentUser }) {
             else if (i === 1) { bgColor = "bg-[#C0C0C0]"; medal = "🥈"; medalColor = "#C0C0C0"; }
             else if (i === 2) { bgColor = "bg-[#CD7F32]"; medal = "🥉"; medalColor = "#CD7F32"; }
 
-            const isSelf = currentUser && (user.username === currentUser || user.name === currentUser);
+            // ✅ Match userId with currentUser.id (not _id)
+            const isSelf =
+              currentUser && String(user.userId) === String(currentUser.id);
+
+            if (isSelf) console.log("💡 Highlighting:", user.username);
 
             return (
               <li
-                key={i}
+                key={user._id || i}
                 className={`p-2 shadow rounded-lg flex justify-between items-center ${
                   isSelf ? "border-2 border-blue-500 bg-blue-50" : bgColor
                 }`}
               >
                 <span>
-                  {i + 1}. {user.username || user.name}{" "}
+                  {i + 1}. {user.username || user.name}
                   {medal && <span style={{ color: medalColor, marginLeft: 4 }}>{medal}</span>}
                   {isSelf && <span className="text-blue-600 font-semibold ml-1">(You)</span>}
                 </span>
