@@ -6,7 +6,7 @@ import React from "react";
 
 function Navbar({ user }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [hovering, setHovering] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const avatarUrl = useMemo(
     () => `https://api.dicebear.com/7.x/initials/svg?seed=${user?.name || "Guest"}`,
@@ -61,9 +61,10 @@ function Navbar({ user }) {
         {user && user.name !== "Guest" ? (
           <div
             className="relative"
-            onMouseEnter={() => setHovering(true)}
-            onMouseLeave={() => setHovering(false)}
+            onMouseEnter={() => setIsDropdownOpen(true)}
+            onMouseLeave={() => setIsDropdownOpen(false)}
           >
+            {/* Avatar + Name */}
             <div className="flex items-center gap-2 cursor-pointer px-3 py-1 rounded-xl hover:bg-gradient-to-r hover:from-purple-50 hover:to-pink-50 transition-all">
               <img
                 src={avatarUrl}
@@ -73,29 +74,32 @@ function Navbar({ user }) {
               <span className="font-semibold text-purple-700">{user.name}</span>
             </div>
 
-            {hovering && (
-              <motion.div
-                key="dropdown"
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -5 }}
-                transition={{ duration: 0.15 }}
-                className="absolute right-0 mt-3 bg-white border border-purple-100 rounded-2xl shadow-lg p-3 w-44"
-              >
-                <Link
-                  to="/dashboard"
-                  className="flex items-center gap-2 px-3 py-2 text-purple-700 rounded-lg hover:bg-gradient-to-r hover:from-purple-100 hover:to-pink-100 transition-all"
+            {/* Animated Dropdown */}
+            <AnimatePresence>
+              {isDropdownOpen && (
+                <motion.div
+                  key="dropdown"
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 mt-3 bg-white border border-purple-100 rounded-2xl shadow-lg p-3 w-44"
                 >
-                  <User size={18} /> Profile
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-2 px-3 py-2 text-red-500 rounded-lg hover:bg-gradient-to-r hover:from-red-100 hover:to-pink-100 transition-all w-full"
-                >
-                  <LogOut size={18} /> Logout
-                </button>
-              </motion.div>
-            )}
+                  <Link
+                    to="/dashboard"
+                    className="flex items-center gap-2 px-3 py-2 text-purple-700 rounded-lg hover:bg-gradient-to-r hover:from-purple-100 hover:to-pink-100 transition-all"
+                  >
+                    <User size={18} /> Profile
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 px-3 py-2 text-red-500 rounded-lg hover:bg-gradient-to-r hover:from-red-100 hover:to-pink-100 transition-all w-full"
+                  >
+                    <LogOut size={18} /> Logout
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         ) : (
           <div className="flex gap-3">
