@@ -22,7 +22,7 @@ export default function Navbar({ user }) {
       {/* Logo */}
       <motion.div whileHover={{ scale: 1.05 }}>
         <Link
-          to="#"
+          {/* to="#" */}
           className="text-3xl font-extrabold bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400 bg-clip-text text-transparent tracking-tight"
         >
           QuizArena
