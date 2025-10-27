@@ -8,43 +8,48 @@ import socket from "../socket";
 export default function ResultPage() {
   const location = useLocation();
   const result = location.state?.result;
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(() => {
+    // ✅ Try reading cached user to avoid delay
+    const cached = sessionStorage.getItem("user");
+    return cached ? JSON.parse(cached) : null;
+  });
+  const [loading, setLoading] = useState(!user);
 
-  // Fetch user + setup socket
+  // ✅ Fetch user only if not cached
   useEffect(() => {
-    const fetchData = async () => {
+    if (user || !result) return;
+
+    const fetchUser = async () => {
       try {
-        if (!result) return;
-
-        const [userRes] = await Promise.all([
-          axiosInstance.get("/api/auth/me")
-        ]);
-
-        const fetchedUser = userRes.data.user || { name: "Guest", username: "Guest" };
-        setUser(fetchedUser);
-
-        // Join leaderboard socket room (after user fetch)
-        if (result.quizId && fetchedUser.username !== "Guest") {
-          const username = fetchedUser.username;
-          const subject = result.subject || "General";
-          socket.emit("joinQuiz", { quizId: result.quizId, user: username });
-          socket.emit("getLeaderboard", { quizId: result.quizId, subject });
-
-          return () => {
-            socket.emit("leaveQuiz", { quizId: result.quizId, user: username });
-          };
-        }
-      } catch (err) {
-        console.error("User fetch failed:", err);
+        const res = await axiosInstance.get("/api/auth/me");
+        const fetched = res.data.user || { name: "Guest", username: "Guest" };
+        setUser(fetched);
+        sessionStorage.setItem("user", JSON.stringify(fetched));
+      } catch {
         setUser({ name: "Guest", username: "Guest" });
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    fetchUser();
   }, [result]);
+
+  // ✅ Setup socket only after user + result available
+  useEffect(() => {
+    if (!result || !user) return;
+    if (user.username === "Guest") return;
+
+    const username = user.username;
+    const subject = result.subject || "General";
+
+    socket.emit("joinQuiz", { quizId: result.quizId, user: username });
+    socket.emit("getLeaderboard", { quizId: result.quizId, subject });
+
+    return () => {
+      socket.emit("leaveQuiz", { quizId: result.quizId, user: username });
+    };
+  }, [user, result]);
 
   if (!result) {
     return (
@@ -108,7 +113,7 @@ export default function ResultPage() {
           </Link>
         </div>
 
-        {/* Leaderboard */}
+        {/* ✅ Lazy load leaderboard after result UI */}
         <div className="bg-white shadow-2xl rounded-2xl p-6 transition hover:shadow-3xl">
           <h2 className="text-xl sm:text-2xl font-bold mb-4 text-purple-700 text-center">
             Leaderboard
@@ -118,6 +123,7 @@ export default function ResultPage() {
               quizId={result.quizId}
               subject={result.subject || "General"}
               currentUser={user.username || user.name}
+              key={result.quizId}
             />
           )}
         </div>
