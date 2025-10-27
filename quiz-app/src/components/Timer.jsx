@@ -2,24 +2,27 @@ import { useEffect, useState, useRef } from "react";
 
 export default function Timer({ duration, onTimeUp }) {
   const [time, setTime] = useState(duration);
-  const timerRef = useRef(null);
+  const startRef = useRef(Date.now());
+  const frameRef = useRef();
 
   useEffect(() => {
-    // ✅ Run timer only once
-    timerRef.current = setInterval(() => {
-      setTime((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current);
-          onTimeUp();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    const tick = () => {
+      const elapsed = Math.floor((Date.now() - startRef.current) / 1000);
+      const remaining = Math.max(duration - elapsed, 0);
+      setTime(remaining);
 
-    // Cleanup on unmount
-    return () => clearInterval(timerRef.current);
-  }, [onTimeUp]);
+      if (remaining === 0) {
+        onTimeUp();
+        cancelAnimationFrame(frameRef.current);
+      } else {
+        frameRef.current = requestAnimationFrame(tick);
+      }
+    };
+
+    frameRef.current = requestAnimationFrame(tick);
+
+    return () => cancelAnimationFrame(frameRef.current);
+  }, [duration, onTimeUp]);
 
   const minutes = Math.floor(time / 60);
   const seconds = time % 60;
